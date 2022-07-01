@@ -5,7 +5,7 @@ use crate::msg::{
 use crate::state::{Config, PaymentInfo, Registration};
 use crate::ContractError;
 use anyhow::Result as AnyResult;
-use cosmwasm_std::{coins, to_binary, Addr, Coin, Empty, StdResult, Uint128};
+use cosmwasm_std::{coin, coins, to_binary, Addr, Coin, Empty, StdResult, Uint128};
 use cw20::{BalanceResponse, Cw20Coin};
 use cw_multi_test::{App, AppResponse, Contract, ContractWrapper, Executor};
 
@@ -161,16 +161,16 @@ fn test_instantiate() {
 fn register_cw20(
     app: &mut App,
     contract_addr: Addr,
-    amount: Uint128,
+    // Pass token address as denom to avoid clippy argument count warning.
+    funds: Coin,
     name: String,
     version: String,
     code_id: u64,
     sender: Addr,
-    token_addr: Addr,
 ) -> AnyResult<AppResponse> {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: contract_addr.to_string(),
-        amount,
+        amount: funds.amount,
         msg: to_binary(&ReceiveMsg::Register {
             name,
             version,
@@ -179,14 +179,13 @@ fn register_cw20(
         })
         .unwrap(),
     };
-    app.execute_contract(sender, token_addr, &msg, &[])
+    app.execute_contract(sender, Addr::unchecked(funds.denom), &msg, &[])
 }
 
 fn register_native(
     app: &mut App,
     contract_addr: Addr,
-    amount: u128,
-    denom: &str,
+    funds: Vec<Coin>,
     name: String,
     version: String,
     code_id: u64,
@@ -198,7 +197,7 @@ fn register_native(
         chain_id: CHAIN_ID.to_string(),
         code_id,
     };
-    app.execute_contract(sender, contract_addr, &msg, &coins(amount, denom))
+    app.execute_contract(sender, contract_addr, &msg, &funds)
 }
 
 fn query_cw20_balance(app: &mut App, token_addr: Addr, addr: Addr) -> Uint128 {
@@ -324,8 +323,7 @@ fn test_register_cw20() {
     let err: ContractError = register_native(
         &mut app,
         contract.clone(),
-        50,
-        "ujuno",
+        coins(50, "ujuno"),
         name.to_string(),
         version.to_string(),
         code_id,
@@ -340,12 +338,11 @@ fn test_register_cw20() {
     let err: ContractError = register_cw20(
         &mut app,
         contract.clone(),
-        Uint128::new(50),
+        coin(50, other_token),
         name.to_string(),
         version.to_string(),
         code_id,
         Addr::unchecked(USER_ADDR),
-        other_token,
     )
     .unwrap_err()
     .downcast()
@@ -356,12 +353,11 @@ fn test_register_cw20() {
     let err: ContractError = register_cw20(
         &mut app,
         contract.clone(),
-        Uint128::new(25),
+        coin(25, token.to_string()),
         name.to_string(),
         version.to_string(),
         code_id,
         Addr::unchecked(USER_ADDR),
-        token.clone(),
     )
     .unwrap_err()
     .downcast()
@@ -372,12 +368,11 @@ fn test_register_cw20() {
     let err: ContractError = register_cw20(
         &mut app,
         contract.clone(),
-        Uint128::new(75),
+        coin(75, token.to_string()),
         name.to_string(),
         version.to_string(),
         code_id,
         Addr::unchecked(USER_ADDR),
-        token.clone(),
     )
     .unwrap_err()
     .downcast()
@@ -388,12 +383,11 @@ fn test_register_cw20() {
     register_cw20(
         &mut app,
         contract.clone(),
-        Uint128::new(50),
+        coin(50, token.to_string()),
         name.to_string(),
         version.to_string(),
         code_id,
         Addr::unchecked(USER_ADDR),
-        token.clone(),
     )
     .unwrap();
 
@@ -429,12 +423,11 @@ fn test_register_cw20() {
     let err: ContractError = register_cw20(
         &mut app,
         contract,
-        Uint128::new(50),
+        coin(50, token),
         name.to_string(),
         version.to_string(),
         code_id,
         Addr::unchecked(USER_ADDR),
-        token,
     )
     .unwrap_err()
     .downcast()
@@ -475,12 +468,11 @@ fn test_register_native() {
     let err: ContractError = register_cw20(
         &mut app,
         contract.clone(),
-        Uint128::new(50),
+        coin(50, token),
         name.to_string(),
         version.to_string(),
         code_id,
         Addr::unchecked(USER_ADDR),
-        token,
     )
     .unwrap_err()
     .downcast()
@@ -491,8 +483,7 @@ fn test_register_native() {
     let err: ContractError = register_native(
         &mut app,
         contract.clone(),
-        50,
-        "uatom",
+        coins(50, "uatom"),
         name.to_string(),
         version.to_string(),
         code_id,
@@ -507,8 +498,7 @@ fn test_register_native() {
     let err: ContractError = register_native(
         &mut app,
         contract.clone(),
-        25,
-        pay_denom,
+        coins(25, pay_denom),
         name.to_string(),
         version.to_string(),
         code_id,
@@ -523,8 +513,7 @@ fn test_register_native() {
     let err: ContractError = register_native(
         &mut app,
         contract.clone(),
-        75,
-        pay_denom,
+        coins(75, pay_denom),
         name.to_string(),
         version.to_string(),
         code_id,
@@ -539,8 +528,7 @@ fn test_register_native() {
     register_native(
         &mut app,
         contract.clone(),
-        50,
-        pay_denom,
+        coins(50, pay_denom),
         name.to_string(),
         version.to_string(),
         code_id,
@@ -583,8 +571,7 @@ fn test_register_native() {
     let err: ContractError = register_native(
         &mut app,
         contract,
-        50,
-        pay_denom,
+        coins(50, pay_denom),
         name.to_string(),
         version.to_string(),
         code_id,
@@ -628,8 +615,7 @@ fn test_immutability() {
     register_native(
         &mut app,
         contract.clone(),
-        50,
-        pay_denom,
+        coins(50, pay_denom),
         name.to_string(),
         version.to_string(),
         code_id,
@@ -664,8 +650,7 @@ fn test_immutability() {
     let err: ContractError = register_native(
         &mut app,
         contract.clone(),
-        50,
-        pay_denom,
+        coins(50, pay_denom),
         name.to_string(),
         version.to_string(),
         code_id,
@@ -683,8 +668,7 @@ fn test_immutability() {
     let err: ContractError = register_native(
         &mut app,
         contract,
-        50,
-        pay_denom,
+        coins(50, pay_denom),
         name.to_string(),
         version.to_string(),
         code_id + 1,
@@ -722,8 +706,7 @@ fn test_set_owner() {
     let err: ContractError = register_native(
         &mut app,
         contract.clone(),
-        50,
-        pay_denom,
+        coins(50, pay_denom),
         name.to_string(),
         version.to_string(),
         code_id,
@@ -748,8 +731,7 @@ fn test_set_owner() {
     register_native(
         &mut app,
         contract.clone(),
-        50,
-        pay_denom,
+        coins(50, pay_denom),
         name.to_string(),
         version.to_string(),
         code_id,
@@ -788,8 +770,7 @@ fn test_set_owner() {
     let err: ContractError = register_native(
         &mut app,
         contract.clone(),
-        50,
-        pay_denom,
+        coins(50, pay_denom),
         name.to_string(),
         new_version.to_string(),
         new_code_id,
@@ -814,8 +795,7 @@ fn test_set_owner() {
     let err: ContractError = register_native(
         &mut app,
         contract.clone(),
-        50,
-        pay_denom,
+        coins(50, pay_denom),
         name.to_string(),
         new_version.to_string(),
         new_code_id,
@@ -830,8 +810,7 @@ fn test_set_owner() {
     register_native(
         &mut app,
         contract.clone(),
-        50,
-        pay_denom,
+        coins(50, pay_denom),
         name.to_string(),
         new_version.to_string(),
         new_code_id,
@@ -952,8 +931,7 @@ fn test_unregister() {
     register_native(
         &mut app,
         contract.clone(),
-        50,
-        pay_denom,
+        coins(50, pay_denom),
         name.to_string(),
         version1.to_string(),
         code_id1,
@@ -965,8 +943,7 @@ fn test_unregister() {
     register_native(
         &mut app,
         contract.clone(),
-        50,
-        pay_denom,
+        coins(50, pay_denom),
         name.to_string(),
         version2.to_string(),
         code_id2,
@@ -978,8 +955,7 @@ fn test_unregister() {
     register_native(
         &mut app,
         contract.clone(),
-        50,
-        pay_denom,
+        coins(50, pay_denom),
         name.to_string(),
         version3.to_string(),
         code_id3,
@@ -1113,8 +1089,7 @@ fn test_mutable_after_unregister() {
     register_native(
         &mut app,
         contract.clone(),
-        50,
-        pay_denom,
+        coins(50, pay_denom),
         name.to_string(),
         version.to_string(),
         code_id,
@@ -1149,8 +1124,7 @@ fn test_mutable_after_unregister() {
     let err: ContractError = register_native(
         &mut app,
         contract.clone(),
-        50,
-        pay_denom,
+        coins(50, pay_denom),
         name.to_string(),
         version.to_string(),
         code_id,
@@ -1168,8 +1142,7 @@ fn test_mutable_after_unregister() {
     let err: ContractError = register_native(
         &mut app,
         contract.clone(),
-        50,
-        pay_denom,
+        coins(50, pay_denom),
         name.to_string(),
         version.to_string(),
         code_id + 1,
@@ -1200,8 +1173,7 @@ fn test_mutable_after_unregister() {
     register_native(
         &mut app,
         contract.clone(),
-        50,
-        pay_denom,
+        coins(50, pay_denom),
         name.to_string(),
         version.to_string(),
         code_id,
@@ -1222,8 +1194,7 @@ fn test_mutable_after_unregister() {
     register_native(
         &mut app,
         contract.clone(),
-        50,
-        pay_denom,
+        coins(50, pay_denom),
         name.to_string(),
         version.to_string(),
         code_id + 1,
