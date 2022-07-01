@@ -30,6 +30,7 @@ export type ExecuteMsg = {
 } | {
   register: {
     chain_id: string;
+    checksum: string;
     code_id: number;
     name: string;
     version: string;
@@ -62,11 +63,13 @@ export interface GetRegistrationResponse {
   registration: Registration;
 }
 export interface Registration {
+  checksum: string;
   code_id: number;
   registered_by: Addr;
   version: string;
 }
 export interface InfoForCodeIdResponse {
+  checksum: string;
   name: string;
   registered_by: Addr;
   version: string;
@@ -100,6 +103,7 @@ export type QueryMsg = {
 export type ReceiveMsg = {
   register: {
     chain_id: string;
+    checksum: string;
     code_id: number;
     name: string;
     version: string;
@@ -210,11 +214,13 @@ export interface CwCodeIdRegistryInterface extends CwCodeIdRegistryReadOnlyInter
   }, fee?: number | StdFee | "auto", memo?: string, funds?: readonly Coin[]) => Promise<ExecuteResult>;
   register: ({
     chainId,
+    checksum,
     codeId,
     name,
     version
   }: {
     chainId: string;
+    checksum: string;
     codeId: number;
     name: string;
     version: string;
@@ -279,11 +285,13 @@ export class CwCodeIdRegistryClient extends CwCodeIdRegistryQueryClient implemen
   };
   register = async ({
     chainId,
+    checksum,
     codeId,
     name,
     version
   }: {
     chainId: string;
+    checksum: string;
     codeId: number;
     name: string;
     version: string;
@@ -291,6 +299,7 @@ export class CwCodeIdRegistryClient extends CwCodeIdRegistryQueryClient implemen
     return await this.client.execute(this.sender, this.contractAddress, {
       register: {
         chain_id: chainId,
+        checksum,
         code_id: codeId,
         name,
         version

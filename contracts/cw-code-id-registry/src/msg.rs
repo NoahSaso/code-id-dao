@@ -22,6 +22,7 @@ pub enum ExecuteMsg {
         version: String,
         chain_id: String,
         code_id: u64,
+        checksum: String,
     },
     /// Set owner for registration.
     SetOwner {
@@ -47,6 +48,7 @@ pub enum ReceiveMsg {
         version: String,
         chain_id: String,
         code_id: u64,
+        checksum: String,
     },
 }
 
@@ -83,6 +85,7 @@ pub struct InfoForCodeIdResponse {
     pub registered_by: Addr,
     pub name: String,
     pub version: String,
+    pub checksum: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]

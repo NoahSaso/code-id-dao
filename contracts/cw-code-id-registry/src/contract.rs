@@ -86,7 +86,8 @@ pub fn execute(
             version,
             chain_id,
             code_id,
-        } => execute_register(deps, info, name, version, chain_id, code_id),
+            checksum,
+        } => execute_register(deps, info, name, version, chain_id, code_id, checksum),
         ExecuteMsg::SetOwner {
             name,
             chain_id,
@@ -134,7 +135,19 @@ pub fn execute_receive(
                     version,
                     chain_id,
                     code_id,
-                } => register_code_id(deps, sender, amount, name, version, chain_id, code_id),
+                    checksum,
+                } => register_code_id(
+                    deps,
+                    amount,
+                    name,
+                    chain_id,
+                    Registration {
+                        registered_by: sender,
+                        version,
+                        code_id,
+                        checksum,
+                    },
+                ),
             }
         }
     }
@@ -147,6 +160,7 @@ pub fn execute_register(
     version: String,
     chain_id: String,
     code_id: u64,
+    checksum: String,
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
 
@@ -154,12 +168,15 @@ pub fn execute_register(
         PaymentInfo::Cw20Payment { .. } => Err(ContractError::InvalidPayment {}),
         PaymentInfo::None {} => register_code_id(
             deps,
-            info.sender,
             Uint128::zero(),
             name,
-            version,
             chain_id,
-            code_id,
+            Registration {
+                registered_by: info.sender,
+                version,
+                code_id,
+                checksum,
+            },
         ),
         PaymentInfo::NativePayment {
             token_denom,
@@ -178,12 +195,15 @@ pub fn execute_register(
 
             register_code_id(
                 deps,
-                info.sender,
                 coins.amount,
                 name,
-                version,
                 chain_id,
-                code_id,
+                Registration {
+                    registered_by: info.sender,
+                    version,
+                    code_id,
+                    checksum,
+                },
             )
         }
     }
@@ -291,22 +311,20 @@ pub fn execute_unregister(
 
 pub fn register_code_id(
     deps: DepsMut,
-    sender: Addr,
     amount_sent: Uint128,
     name: String,
-    version: String,
     chain_id: String,
-    code_id: u64,
+    registration: Registration,
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     let existing_owner =
         NAME_CHAIN_ID_TO_OWNER.may_load(deps.storage, (name.clone(), chain_id.clone()))?;
 
     // If not admin, ensure sender has access to register.
-    if sender != config.admin {
+    if registration.registered_by != config.admin {
         // If has owner set, ensure sender is owner.
         if let Some(owner) = existing_owner {
-            if sender != owner {
+            if registration.registered_by != owner {
                 return Err(ContractError::Unauthorized {});
             }
             // If no owner set, unauthorized.
@@ -317,30 +335,30 @@ pub fn register_code_id(
 
     // Can't re-register a code ID on a chain.
     if CHAIN_ID_CODE_ID_TO_NAME
-        .may_load(deps.storage, (chain_id.clone(), code_id))?
+        .may_load(deps.storage, (chain_id.clone(), registration.code_id))?
         .is_some()
     {
-        return Err(ContractError::CodeIDAlreadyRegistered(code_id, chain_id));
+        return Err(ContractError::CodeIDAlreadyRegistered(
+            registration.code_id,
+            chain_id,
+        ));
     }
 
     // Can't re-register a version.
     if VERSION_REGISTRATION
         .may_load(
             deps.storage,
-            (name.clone(), chain_id.clone(), version.clone()),
+            (name.clone(), chain_id.clone(), registration.version.clone()),
         )?
         .is_some()
     {
         return Err(ContractError::VersionAlreadyRegistered(
-            version, name, chain_id,
+            registration.version,
+            name,
+            chain_id,
         ));
     };
 
-    let registration = Registration {
-        registered_by: sender,
-        version: version.clone(),
-        code_id,
-    };
     ALL_REGISTRATIONS.update(
         deps.storage,
         (name.clone(), chain_id.clone()),
@@ -352,7 +370,7 @@ pub fn register_code_id(
     )?;
     VERSION_REGISTRATION.save(
         deps.storage,
-        (name.clone(), chain_id.clone(), version),
+        (name.clone(), chain_id.clone(), registration.version.clone()),
         &registration,
     )?;
     LATEST_REGISTRATION.save(
@@ -360,7 +378,7 @@ pub fn register_code_id(
         (name.clone(), chain_id.clone()),
         &registration,
     )?;
-    CHAIN_ID_CODE_ID_TO_NAME.save(deps.storage, (chain_id, code_id), &name)?;
+    CHAIN_ID_CODE_ID_TO_NAME.save(deps.storage, (chain_id, registration.code_id), &name)?;
 
     // Send payment to admin.
     let msgs = if amount_sent > Uint128::zero() {
@@ -485,6 +503,7 @@ pub fn query_info_for_code_id(deps: Deps, chain_id: String, code_id: u64) -> Std
         registered_by: registration.registered_by,
         name,
         version: registration.version,
+        checksum: registration.checksum,
     })
 }
 

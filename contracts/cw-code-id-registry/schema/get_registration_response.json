@@ -19,11 +19,15 @@
     "Registration": {
       "type": "object",
       "required": [
+        "checksum",
         "code_id",
         "registered_by",
         "version"
       ],
       "properties": {
+        "checksum": {
+          "type": "string"
+        },
         "code_id": {
           "type": "integer",
           "format": "uint64",

@@ -173,9 +173,10 @@ fn register_cw20(
         amount: funds.amount,
         msg: to_binary(&ReceiveMsg::Register {
             name,
-            version,
+            version: version.clone(),
             chain_id: CHAIN_ID.to_string(),
             code_id,
+            checksum: version,
         })
         .unwrap(),
     };
@@ -193,9 +194,10 @@ fn register_native(
 ) -> AnyResult<AppResponse> {
     let msg = ExecuteMsg::Register {
         name,
-        version,
+        version: version.clone(),
         chain_id: CHAIN_ID.to_string(),
         code_id,
+        checksum: version,
     };
     app.execute_contract(sender, contract_addr, &msg, &funds)
 }
@@ -411,7 +413,8 @@ fn test_register_cw20() {
         Registration {
             registered_by: Addr::unchecked(USER_ADDR),
             version: version.to_string(),
-            code_id
+            code_id,
+            checksum: version.to_string(),
         }
     );
     assert_eq!(
@@ -559,7 +562,8 @@ fn test_register_native() {
         Registration {
             registered_by: Addr::unchecked(USER_ADDR),
             version: version.to_string(),
-            code_id
+            code_id,
+            checksum: version.to_string(),
         }
     );
     assert_eq!(
@@ -638,7 +642,8 @@ fn test_immutability() {
         Registration {
             registered_by: Addr::unchecked(USER_ADDR),
             version: version.to_string(),
-            code_id
+            code_id,
+            checksum: version.to_string(),
         }
     );
     assert_eq!(
@@ -754,7 +759,8 @@ fn test_set_owner() {
         Registration {
             registered_by: Addr::unchecked(USER_ADDR),
             version: version.to_string(),
-            code_id
+            code_id,
+            checksum: version.to_string(),
         }
     );
     assert_eq!(
@@ -833,7 +839,8 @@ fn test_set_owner() {
         Registration {
             registered_by: Addr::unchecked(OTHER_USER_ADDR),
             version: new_version.to_string(),
-            code_id: new_code_id
+            code_id: new_code_id,
+            checksum: new_version.to_string(),
         }
     );
     assert_eq!(
@@ -851,12 +858,14 @@ fn test_set_owner() {
             Registration {
                 registered_by: Addr::unchecked(USER_ADDR),
                 version: version.to_string(),
-                code_id
+                code_id,
+                checksum: version.to_string(),
             },
             Registration {
                 registered_by: Addr::unchecked(OTHER_USER_ADDR),
                 version: new_version.to_string(),
-                code_id: new_code_id
+                code_id: new_code_id,
+                checksum: new_version.to_string(),
             }
         ]
     );
@@ -868,7 +877,8 @@ fn test_set_owner() {
         InfoForCodeIdResponse {
             registered_by: Addr::unchecked(USER_ADDR),
             name: name.to_string(),
-            version: version.to_string()
+            version: version.to_string(),
+            checksum: version.to_string(),
         }
     );
     let new_info = query_info_for_code_id(&mut app, contract, new_code_id).unwrap();
@@ -877,7 +887,8 @@ fn test_set_owner() {
         InfoForCodeIdResponse {
             registered_by: Addr::unchecked(OTHER_USER_ADDR),
             name: name.to_string(),
-            version: new_version.to_string()
+            version: new_version.to_string(),
+            checksum: new_version.to_string(),
         }
     );
 }
@@ -905,16 +916,19 @@ fn test_unregister() {
         registered_by: Addr::unchecked(USER_ADDR),
         version: version1.to_string(),
         code_id: code_id1,
+        checksum: version1.to_string(),
     };
     let reg2 = Registration {
         registered_by: Addr::unchecked(USER_ADDR),
         version: version2.to_string(),
         code_id: code_id2,
+        checksum: version2.to_string(),
     };
     let reg3 = Registration {
         registered_by: Addr::unchecked(USER_ADDR),
         version: version3.to_string(),
         code_id: code_id3,
+        checksum: version3.to_string(),
     };
 
     // Give user address ownership over name.
@@ -1112,7 +1126,8 @@ fn test_mutable_after_unregister() {
         Registration {
             registered_by: Addr::unchecked(USER_ADDR),
             version: version.to_string(),
-            code_id
+            code_id,
+            checksum: version.to_string(),
         }
     );
     assert_eq!(
@@ -1209,7 +1224,8 @@ fn test_mutable_after_unregister() {
         InfoForCodeIdResponse {
             registered_by: Addr::unchecked(USER_ADDR),
             name: name.to_string(),
-            version: version.to_string()
+            version: version.to_string(),
+            checksum: version.to_string(),
         }
     );
 }

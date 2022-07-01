@@ -3,11 +3,15 @@
   "title": "InfoForCodeIdResponse",
   "type": "object",
   "required": [
+    "checksum",
     "name",
     "registered_by",
     "version"
   ],
   "properties": {
+    "checksum": {
+      "type": "string"
+    },
     "name": {
       "type": "string"
     },

@@ -32,6 +32,7 @@ pub struct Registration {
     pub registered_by: Addr,
     pub version: String,
     pub code_id: u64,
+    pub checksum: String,
 }
 
 pub const CONFIG: Item<Config> = Item::new("config");

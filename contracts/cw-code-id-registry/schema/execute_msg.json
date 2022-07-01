@@ -26,12 +26,16 @@
           "type": "object",
           "required": [
             "chain_id",
+            "checksum",
             "code_id",
             "name",
             "version"
           ],
           "properties": {
             "chain_id": {
+              "type": "string"
+            },
+            "checksum": {
               "type": "string"
             },
             "code_id": {
