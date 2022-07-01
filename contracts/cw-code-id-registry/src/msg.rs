@@ -13,26 +13,24 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    // Receive payment to register when payment info is a CW20.
+    /// Receive payment to register when payment info is a CW20.
     Receive(Cw20ReceiveMsg),
-    // Receive payment to register when payment info is native.
+    /// Receive payment to register when payment info is native.
     Register {
         name: String,
         version: String,
         chain_id: String,
         code_id: u64,
     },
-    // Set owner for registration.
+    /// Set owner for registration.
     SetOwner {
         name: String,
         chain_id: String,
         owner: Option<String>,
     },
-    // Allow admin to unregister code IDs.
-    Unregister {
-        chain_id: String,
-        code_id: u64,
-    },
+    /// Allow admin to unregister code IDs.
+    Unregister { chain_id: String, code_id: u64 },
+    /// Update config.
     UpdateConfig {
         admin: Option<String>,
         payment_info: Option<PaymentInfo>,

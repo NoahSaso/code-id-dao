@@ -5,7 +5,7 @@ use crate::msg::{
 use crate::state::{Config, PaymentInfo, Registration};
 use crate::ContractError;
 use anyhow::Result as AnyResult;
-use cosmwasm_std::{coins, to_binary, Addr, Coin, Empty, Uint128};
+use cosmwasm_std::{coins, to_binary, Addr, Coin, Empty, StdResult, Uint128};
 use cw20::{BalanceResponse, Cw20Coin};
 use cw_multi_test::{App, AppResponse, Contract, ContractWrapper, Executor};
 
@@ -256,37 +256,37 @@ fn query_get_registration(
     contract_addr: Addr,
     name: String,
     version: Option<String>,
-) -> GetRegistrationResponse {
+) -> StdResult<GetRegistrationResponse> {
     let msg = QueryMsg::GetRegistration {
         name,
         chain_id: CHAIN_ID.to_string(),
         version,
     };
-    app.wrap().query_wasm_smart(contract_addr, &msg).unwrap()
+    app.wrap().query_wasm_smart(contract_addr, &msg)
 }
 
 fn query_info_for_code_id(
     app: &mut App,
     contract_addr: Addr,
     code_id: u64,
-) -> InfoForCodeIdResponse {
+) -> StdResult<InfoForCodeIdResponse> {
     let msg = QueryMsg::InfoForCodeId {
         chain_id: CHAIN_ID.to_string(),
         code_id,
     };
-    app.wrap().query_wasm_smart(contract_addr, &msg).unwrap()
+    app.wrap().query_wasm_smart(contract_addr, &msg)
 }
 
 fn query_list_registrations(
     app: &mut App,
     contract_addr: Addr,
     name: String,
-) -> ListRegistrationsResponse {
+) -> StdResult<ListRegistrationsResponse> {
     let msg = QueryMsg::ListRegistrations {
         name,
         chain_id: CHAIN_ID.to_string(),
     };
-    app.wrap().query_wasm_smart(contract_addr, &msg).unwrap()
+    app.wrap().query_wasm_smart(contract_addr, &msg)
 }
 
 fn query_config(app: &mut App, contract_addr: Addr) -> Config {
@@ -404,13 +404,14 @@ fn test_register_cw20() {
 
     // Check registration with and without version.
     let resp_without_version =
-        query_get_registration(&mut app, contract.clone(), name.to_string(), None);
+        query_get_registration(&mut app, contract.clone(), name.to_string(), None).unwrap();
     let resp_with_version = query_get_registration(
         &mut app,
         contract.clone(),
         name.to_string(),
         Some(version.to_string()),
-    );
+    )
+    .unwrap();
     assert_eq!(
         resp_without_version.registration,
         Registration {
@@ -557,13 +558,14 @@ fn test_register_native() {
 
     // Check registration with and without version.
     let resp_without_version =
-        query_get_registration(&mut app, contract.clone(), name.to_string(), None);
+        query_get_registration(&mut app, contract.clone(), name.to_string(), None).unwrap();
     let resp_with_version = query_get_registration(
         &mut app,
         contract.clone(),
         name.to_string(),
         Some(version.to_string()),
-    );
+    )
+    .unwrap();
     assert_eq!(
         resp_without_version.registration,
         Registration {
@@ -637,13 +639,14 @@ fn test_immutability() {
 
     // Check registration with and without version.
     let resp_without_version =
-        query_get_registration(&mut app, contract.clone(), name.to_string(), None);
+        query_get_registration(&mut app, contract.clone(), name.to_string(), None).unwrap();
     let resp_with_version = query_get_registration(
         &mut app,
         contract.clone(),
         name.to_string(),
         Some(version.to_string()),
-    );
+    )
+    .unwrap();
     assert_eq!(
         resp_without_version.registration,
         Registration {
@@ -756,13 +759,14 @@ fn test_set_owner() {
 
     // Check registration with and without version.
     let resp_without_version =
-        query_get_registration(&mut app, contract.clone(), name.to_string(), None);
+        query_get_registration(&mut app, contract.clone(), name.to_string(), None).unwrap();
     let resp_with_version = query_get_registration(
         &mut app,
         contract.clone(),
         name.to_string(),
         Some(version.to_string()),
-    );
+    )
+    .unwrap();
     assert_eq!(
         resp_without_version.registration,
         Registration {
@@ -837,13 +841,14 @@ fn test_set_owner() {
 
     // Check registration with and without version.
     let resp_without_version =
-        query_get_registration(&mut app, contract.clone(), name.to_string(), None);
+        query_get_registration(&mut app, contract.clone(), name.to_string(), None).unwrap();
     let resp_with_version = query_get_registration(
         &mut app,
         contract.clone(),
         name.to_string(),
         Some(new_version.to_string()),
-    );
+    )
+    .unwrap();
     assert_eq!(
         resp_without_version.registration,
         Registration {
@@ -858,8 +863,9 @@ fn test_set_owner() {
     );
 
     // Get all registrations and verify both exist.
-    let registrations =
-        query_list_registrations(&mut app, contract, name.to_string()).registrations;
+    let registrations = query_list_registrations(&mut app, contract.clone(), name.to_string())
+        .unwrap()
+        .registrations;
     assert_eq!(
         registrations,
         vec![
@@ -874,7 +880,367 @@ fn test_set_owner() {
                 code_id: new_code_id
             }
         ]
+    );
+
+    // Get info for each code ID.
+    let info = query_info_for_code_id(&mut app, contract.clone(), code_id).unwrap();
+    assert_eq!(
+        info,
+        InfoForCodeIdResponse {
+            registered_by: Addr::unchecked(USER_ADDR),
+            name: name.to_string(),
+            version: version.to_string()
+        }
+    );
+    let new_info = query_info_for_code_id(&mut app, contract, new_code_id).unwrap();
+    assert_eq!(
+        new_info,
+        InfoForCodeIdResponse {
+            registered_by: Addr::unchecked(OTHER_USER_ADDR),
+            name: name.to_string(),
+            version: new_version.to_string()
+        }
+    );
+}
+
+#[test]
+fn test_unregister() {
+    let mut app = setup_app();
+    let pay_denom = "ujuno";
+    let contract = setup_test_case(
+        &mut app,
+        PaymentInfo::NativePayment {
+            token_denom: pay_denom.to_string(),
+            payment_amount: Uint128::new(50),
+        },
+    );
+    let name: &str = "Name1";
+    let version1: &str = "0.0.1";
+    let code_id1: u64 = 1;
+    let version2: &str = "0.0.2";
+    let code_id2: u64 = 2;
+    let version3: &str = "0.0.3";
+    let code_id3: u64 = 3;
+
+    let reg1 = Registration {
+        registered_by: Addr::unchecked(USER_ADDR),
+        version: version1.to_string(),
+        code_id: code_id1,
+    };
+    let reg2 = Registration {
+        registered_by: Addr::unchecked(USER_ADDR),
+        version: version2.to_string(),
+        code_id: code_id2,
+    };
+    let reg3 = Registration {
+        registered_by: Addr::unchecked(USER_ADDR),
+        version: version3.to_string(),
+        code_id: code_id3,
+    };
+
+    // Give user address ownership over name.
+    set_owner(
+        &mut app,
+        contract.clone(),
+        name.to_string(),
+        Some(USER_ADDR.to_string()),
+        Addr::unchecked(ADMIN_ADDR),
     )
+    .unwrap();
+
+    // Register 1 succeeds.
+    register_native(
+        &mut app,
+        contract.clone(),
+        50,
+        pay_denom,
+        name.to_string(),
+        version1.to_string(),
+        code_id1,
+        Addr::unchecked(USER_ADDR),
+    )
+    .unwrap();
+
+    // Register 2 succeeds.
+    register_native(
+        &mut app,
+        contract.clone(),
+        50,
+        pay_denom,
+        name.to_string(),
+        version2.to_string(),
+        code_id2,
+        Addr::unchecked(USER_ADDR),
+    )
+    .unwrap();
+
+    // Register 3 succeeds.
+    register_native(
+        &mut app,
+        contract.clone(),
+        50,
+        pay_denom,
+        name.to_string(),
+        version3.to_string(),
+        code_id3,
+        Addr::unchecked(USER_ADDR),
+    )
+    .unwrap();
+
+    // Get all registrations and verify all exist.
+    let registrations = query_list_registrations(&mut app, contract.clone(), name.to_string())
+        .unwrap()
+        .registrations;
+    assert_eq!(
+        registrations,
+        vec![reg1.clone(), reg2.clone(), reg3.clone()]
+    );
+
+    // Get latest and ensure it is 3.
+    let latest_registration =
+        query_get_registration(&mut app, contract.clone(), name.to_string(), None)
+            .unwrap()
+            .registration;
+    assert_eq!(latest_registration, reg3);
+
+    // Attempt unregister 3 by user but fail because not admin.
+    let err: ContractError = unregister(
+        &mut app,
+        contract.clone(),
+        code_id3,
+        Addr::unchecked(USER_ADDR),
+    )
+    .unwrap_err()
+    .downcast()
+    .unwrap();
+    assert_eq!(err, ContractError::Unauthorized {});
+
+    // Unregister 3
+    unregister(
+        &mut app,
+        contract.clone(),
+        code_id3,
+        Addr::unchecked(ADMIN_ADDR),
+    )
+    .unwrap();
+
+    // Attempt to get info for 3 and expect not found.
+    let err = query_info_for_code_id(&mut app, contract.clone(), code_id3).unwrap_err();
+    assert!(err
+        .to_string()
+        .contains(&ContractError::NotFound {}.to_string()));
+    // Attempt to get registration for 3 and expect not found.
+    let err = query_get_registration(
+        &mut app,
+        contract.clone(),
+        name.to_string(),
+        Some(version3.to_string()),
+    )
+    .unwrap_err();
+    assert!(err
+        .to_string()
+        .contains(&ContractError::NotFound {}.to_string()));
+
+    // Get latest and ensure it is 2.
+    let latest_registration =
+        query_get_registration(&mut app, contract.clone(), name.to_string(), None)
+            .unwrap()
+            .registration;
+    assert_eq!(latest_registration, reg2);
+
+    // Get all registrations and verify only 1 and 2 exist.
+    let registrations = query_list_registrations(&mut app, contract.clone(), name.to_string())
+        .unwrap()
+        .registrations;
+    assert_eq!(registrations, vec![reg1, reg2]);
+
+    // Unregister 1 and 2
+    unregister(
+        &mut app,
+        contract.clone(),
+        code_id1,
+        Addr::unchecked(ADMIN_ADDR),
+    )
+    .unwrap();
+    unregister(
+        &mut app,
+        contract.clone(),
+        code_id2,
+        Addr::unchecked(ADMIN_ADDR),
+    )
+    .unwrap();
+
+    // Expect not found when attempting to get latest.
+    let err =
+        query_get_registration(&mut app, contract.clone(), name.to_string(), None).unwrap_err();
+    assert!(err
+        .to_string()
+        .contains(&ContractError::NotFound {}.to_string()));
+
+    // Get all registrations and expect not found.
+    let err = query_list_registrations(&mut app, contract, name.to_string()).unwrap_err();
+    assert!(err
+        .to_string()
+        .contains(&ContractError::NotFound {}.to_string()));
+}
+
+#[test]
+fn test_mutable_after_unregister() {
+    let mut app = setup_app();
+    let pay_denom = "ujuno";
+    let contract = setup_test_case(
+        &mut app,
+        PaymentInfo::NativePayment {
+            token_denom: pay_denom.to_string(),
+            payment_amount: Uint128::new(50),
+        },
+    );
+    let name: &str = "Name";
+    let version: &str = "0.0.1";
+    let code_id: u64 = 1;
+
+    // Give user address ownership over name.
+    set_owner(
+        &mut app,
+        contract.clone(),
+        name.to_string(),
+        Some(USER_ADDR.to_string()),
+        Addr::unchecked(ADMIN_ADDR),
+    )
+    .unwrap();
+
+    // Register.
+    register_native(
+        &mut app,
+        contract.clone(),
+        50,
+        pay_denom,
+        name.to_string(),
+        version.to_string(),
+        code_id,
+        Addr::unchecked(USER_ADDR),
+    )
+    .unwrap();
+
+    // Check registration with and without version.
+    let resp_without_version =
+        query_get_registration(&mut app, contract.clone(), name.to_string(), None).unwrap();
+    let resp_with_version = query_get_registration(
+        &mut app,
+        contract.clone(),
+        name.to_string(),
+        Some(version.to_string()),
+    )
+    .unwrap();
+    assert_eq!(
+        resp_without_version.registration,
+        Registration {
+            registered_by: Addr::unchecked(USER_ADDR),
+            version: version.to_string(),
+            code_id
+        }
+    );
+    assert_eq!(
+        resp_without_version.registration,
+        resp_with_version.registration,
+    );
+
+    // Should fail with Code ID already registered.
+    let err: ContractError = register_native(
+        &mut app,
+        contract.clone(),
+        50,
+        pay_denom,
+        name.to_string(),
+        version.to_string(),
+        code_id,
+        Addr::unchecked(USER_ADDR),
+    )
+    .unwrap_err()
+    .downcast()
+    .unwrap();
+    assert_eq!(
+        err,
+        ContractError::CodeIDAlreadyRegistered(code_id, CHAIN_ID.to_string())
+    );
+
+    // Should fail with version already registered.
+    let err: ContractError = register_native(
+        &mut app,
+        contract.clone(),
+        50,
+        pay_denom,
+        name.to_string(),
+        version.to_string(),
+        code_id + 1,
+        Addr::unchecked(USER_ADDR),
+    )
+    .unwrap_err()
+    .downcast()
+    .unwrap();
+    assert_eq!(
+        err,
+        ContractError::VersionAlreadyRegistered(
+            version.to_string(),
+            name.to_string(),
+            CHAIN_ID.to_string()
+        )
+    );
+
+    // Unregister
+    unregister(
+        &mut app,
+        contract.clone(),
+        code_id,
+        Addr::unchecked(ADMIN_ADDR),
+    )
+    .unwrap();
+
+    // Should NOT fail with Code ID already registered.
+    register_native(
+        &mut app,
+        contract.clone(),
+        50,
+        pay_denom,
+        name.to_string(),
+        version.to_string(),
+        code_id,
+        Addr::unchecked(USER_ADDR),
+    )
+    .unwrap();
+
+    // Unregister
+    unregister(
+        &mut app,
+        contract.clone(),
+        code_id,
+        Addr::unchecked(ADMIN_ADDR),
+    )
+    .unwrap();
+
+    // Should NOT fail with version already registered.
+    register_native(
+        &mut app,
+        contract.clone(),
+        50,
+        pay_denom,
+        name.to_string(),
+        version.to_string(),
+        code_id + 1,
+        Addr::unchecked(USER_ADDR),
+    )
+    .unwrap();
+
+    // Get info for new code ID.
+    let info = query_info_for_code_id(&mut app, contract, code_id + 1).unwrap();
+    assert_eq!(
+        info,
+        InfoForCodeIdResponse {
+            registered_by: Addr::unchecked(USER_ADDR),
+            name: name.to_string(),
+            version: version.to_string()
+        }
+    );
 }
 
 #[test]

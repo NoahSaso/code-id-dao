@@ -250,37 +250,33 @@ pub fn execute_unregister(
         .find(|r| r.code_id == code_id)
         .ok_or(ContractError::NotFound {})?;
 
-    // Remove from ALL_REGISTRATIONS.
-    let mut remaining_registrations = registrations;
-    remaining_registrations.retain(|r| r.code_id != code_id);
-    ALL_REGISTRATIONS.save(
-        deps.storage,
-        (name.clone(), chain_id.clone()),
-        &remaining_registrations,
-    )?;
-
     // Remove from VERSION_REGISTRATION.
     VERSION_REGISTRATION.remove(
         deps.storage,
-        (name.clone(), chain_id.clone(), registration.version.clone()),
+        (name.clone(), chain_id.clone(), registration.version),
     );
 
-    // Check if we removed the latest registration and update accordingly.
-    let latest_registration = LATEST_REGISTRATION
-        .load(deps.storage, (name.clone(), chain_id.clone()))
-        .map_err(|_| ContractError::NotFound {})?;
-    if latest_registration == registration {
-        if remaining_registrations.is_empty() {
-            // Clear LATEST_REGISTRATION if no more registrations.
-            LATEST_REGISTRATION.remove(deps.storage, (name.clone(), chain_id.clone()));
-        } else {
-            // Update LATEST_REGISTRATION to last registration in vector.
-            LATEST_REGISTRATION.save(
-                deps.storage,
-                (name.clone(), chain_id.clone()),
-                remaining_registrations.last().unwrap(),
-            )?;
-        }
+    // Remove from ALL_REGISTRATIONS.
+    let mut remaining_registrations = registrations;
+    remaining_registrations.retain(|r| r.code_id != code_id);
+    if remaining_registrations.is_empty() {
+        // Clear registrations state if no more.
+        ALL_REGISTRATIONS.remove(deps.storage, (name.clone(), chain_id.clone()));
+        LATEST_REGISTRATION.remove(deps.storage, (name.clone(), chain_id.clone()));
+    } else {
+        // Update with remaining.
+        ALL_REGISTRATIONS.save(
+            deps.storage,
+            (name.clone(), chain_id.clone()),
+            &remaining_registrations,
+        )?;
+        // Update LATEST_REGISTRATION to last registration in vector, just
+        // in case the last one was unregistered.
+        LATEST_REGISTRATION.save(
+            deps.storage,
+            (name.clone(), chain_id.clone()),
+            remaining_registrations.last().unwrap(),
+        )?;
     }
 
     // Remove from name map.

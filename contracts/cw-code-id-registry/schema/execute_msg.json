@@ -3,6 +3,7 @@
   "title": "ExecuteMsg",
   "oneOf": [
     {
+      "description": "Receive payment to register when payment info is a CW20.",
       "type": "object",
       "required": [
         "receive"
@@ -15,6 +16,7 @@
       "additionalProperties": false
     },
     {
+      "description": "Receive payment to register when payment info is native.",
       "type": "object",
       "required": [
         "register"
@@ -49,6 +51,7 @@
       "additionalProperties": false
     },
     {
+      "description": "Set owner for registration.",
       "type": "object",
       "required": [
         "set_owner"
@@ -79,6 +82,7 @@
       "additionalProperties": false
     },
     {
+      "description": "Allow admin to unregister code IDs.",
       "type": "object",
       "required": [
         "unregister"
@@ -105,6 +109,7 @@
       "additionalProperties": false
     },
     {
+      "description": "Update config.",
       "type": "object",
       "required": [
         "update_config"
