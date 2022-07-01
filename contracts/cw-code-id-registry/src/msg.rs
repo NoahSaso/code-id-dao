@@ -5,13 +5,14 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct InstantiateMsg {
     pub admin: String,
     pub payment_info: PaymentInfo,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum ExecuteMsg {
     /// Receive payment to register when payment info is a CW20.
     Receive(Cw20ReceiveMsg),
@@ -38,7 +39,7 @@ pub enum ExecuteMsg {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum ReceiveMsg {
     // Receive payment to register when payment info is a CW20.
     Register {
@@ -50,7 +51,7 @@ pub enum ReceiveMsg {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum QueryMsg {
     Config {},
     /// If version provided, tries to find given version. Otherwise returns
@@ -71,13 +72,13 @@ pub enum QueryMsg {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct GetRegistrationResponse {
     pub registration: Registration,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct InfoForCodeIdResponse {
     pub registered_by: Addr,
     pub name: String,
@@ -85,7 +86,7 @@ pub struct InfoForCodeIdResponse {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct ListRegistrationsResponse {
     pub registrations: Vec<Registration>,
 }

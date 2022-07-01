@@ -14,6 +14,7 @@
       "$ref": "#/definitions/PaymentInfo"
     }
   },
+  "additionalProperties": false,
   "definitions": {
     "PaymentInfo": {
       "oneOf": [
@@ -24,7 +25,8 @@
           ],
           "properties": {
             "none": {
-              "type": "object"
+              "type": "object",
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -48,7 +50,8 @@
                 "token_denom": {
                   "type": "string"
                 }
-              }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -72,7 +75,8 @@
                 "token_address": {
                   "type": "string"
                 }
-              }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
