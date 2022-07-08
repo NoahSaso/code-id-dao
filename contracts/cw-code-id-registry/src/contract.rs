@@ -42,7 +42,7 @@ fn validate_payment_info(deps: Deps, payment_info: &PaymentInfo) -> Result<(), C
             }
 
             // Validate it is a valid CW20 address
-            let payment_token_address = deps.api.addr_validate(&token_address)?;
+            let payment_token_address = deps.api.addr_validate(token_address)?;
             assert_cw20(deps, &payment_token_address)?;
         }
         PaymentInfo::NativePayment { payment_amount, .. } => {
@@ -223,7 +223,7 @@ pub fn execute_set_owner(
     }
 
     if let Some(owner) = owner.as_ref() {
-        let new_owner = deps.api.addr_validate(&owner)?;
+        let new_owner = deps.api.addr_validate(owner)?;
         // Update owner.
         NAME_CHAIN_ID_TO_OWNER.save(deps.storage, (name.clone(), chain_id.clone()), &new_owner)?;
     } else {
@@ -437,7 +437,7 @@ pub fn query_get_registration(
         NAME_CHAIN_ID_CODE_ID_TO_REGISTRATION
             .prefix((name, chain_id))
             .range(deps.storage, None, None, Order::Descending)
-            .nth(0)
+            .next()
             .ok_or(StdError::GenericErr {
                 msg: ContractError::NotFound {}.to_string(),
             })?
@@ -459,7 +459,7 @@ pub fn query_info_for_code_id(deps: Deps, chain_id: String, code_id: u64) -> Std
 
     // Retrieve registration.
     let registration = NAME_CHAIN_ID_CODE_ID_TO_REGISTRATION
-        .load(deps.storage, (name.clone(), chain_id.clone(), code_id))
+        .load(deps.storage, (name.clone(), chain_id, code_id))
         .map_err(|_| StdError::GenericErr {
             msg: ContractError::NotFound {}.to_string(),
         })?;
