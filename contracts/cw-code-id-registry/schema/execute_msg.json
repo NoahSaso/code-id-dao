@@ -98,7 +98,8 @@
           "type": "object",
           "required": [
             "chain_id",
-            "code_id"
+            "code_id",
+            "name"
           ],
           "properties": {
             "chain_id": {
@@ -108,6 +109,9 @@
               "type": "integer",
               "format": "uint64",
               "minimum": 0.0
+            },
+            "name": {
+              "type": "string"
             }
           },
           "additionalProperties": false

@@ -2,10 +2,11 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     coins, from_binary, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
-    MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg,
+    MessageInfo, Order, Response, StdError, StdResult, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
 use cw20::{Cw20ReceiveMsg, TokenInfoResponse};
+use cw_utils::must_pay;
 
 use crate::error::ContractError;
 use crate::msg::{
@@ -13,8 +14,9 @@ use crate::msg::{
     ListRegistrationsResponse, QueryMsg, ReceiveMsg,
 };
 use crate::state::{
-    Config, PaymentInfo, Registration, ALL_REGISTRATIONS, CHAIN_ID_CODE_ID_TO_NAME, CONFIG,
-    LATEST_REGISTRATION, NAME_CHAIN_ID_TO_OWNER, VERSION_REGISTRATION,
+    Config, PaymentInfo, Registration, CHAIN_ID_CODE_ID_TO_NAME, CONFIG,
+    NAME_CHAIN_ID_CODE_ID_TO_REGISTRATION, NAME_CHAIN_ID_TO_OWNER,
+    NAME_CHAIN_ID_VERSION_TO_CODE_ID,
 };
 
 const CONTRACT_NAME: &str = "crates.io:cw-code-id-registry";
@@ -28,7 +30,7 @@ fn assert_cw20(deps: Deps, cw20_addr: &Addr) -> Result<(), ContractError> {
     Ok(())
 }
 
-fn validate_payment_info(deps: Deps, payment_info: PaymentInfo) -> Result<(), ContractError> {
+fn validate_payment_info(deps: Deps, payment_info: &PaymentInfo) -> Result<(), ContractError> {
     match payment_info {
         PaymentInfo::None {} => {}
         PaymentInfo::Cw20Payment {
@@ -61,7 +63,7 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    validate_payment_info(deps.as_ref(), msg.payment_info.clone())?;
+    validate_payment_info(deps.as_ref(), &msg.payment_info)?;
     let validated_admin = deps.api.addr_validate(&msg.admin)?;
     let config = Config {
         admin: validated_admin,
@@ -93,9 +95,11 @@ pub fn execute(
             chain_id,
             owner,
         } => execute_set_owner(deps, info.sender, name, chain_id, owner),
-        ExecuteMsg::Unregister { chain_id, code_id } => {
-            execute_unregister(deps, info.sender, chain_id, code_id)
-        }
+        ExecuteMsg::Unregister {
+            name,
+            chain_id,
+            code_id,
+        } => execute_unregister(deps, info.sender, name, chain_id, code_id),
         ExecuteMsg::UpdateConfig {
             admin,
             payment_info,
@@ -111,8 +115,6 @@ pub fn execute_receive(
     let config = CONFIG.load(deps.storage)?;
 
     match config.payment_info {
-        PaymentInfo::None {} => Err(ContractError::InvalidPayment {}),
-        PaymentInfo::NativePayment { .. } => Err(ContractError::InvalidPayment {}),
         PaymentInfo::Cw20Payment {
             token_address,
             payment_amount,
@@ -150,6 +152,7 @@ pub fn execute_receive(
                 ),
             }
         }
+        _ => Err(ContractError::InvalidPayment {}),
     }
 }
 
@@ -182,20 +185,14 @@ pub fn execute_register(
             token_denom,
             payment_amount,
         } => {
-            let token_idx = info.funds.iter().position(|c| c.denom == token_denom);
-            if token_idx.is_none() {
-                return Err(ContractError::UnrecognizedNativeToken {});
-            }
-
-            let coins = &info.funds[token_idx.unwrap()];
-
-            if payment_amount != coins.amount {
+            let amount_paid = must_pay(&info, &token_denom)?;
+            if payment_amount != amount_paid {
                 return Err(ContractError::IncorrectPaymentAmount {});
             }
 
             register_code_id(
                 deps,
-                coins.amount,
+                amount_paid,
                 name,
                 chain_id,
                 Registration {
@@ -225,7 +222,7 @@ pub fn execute_set_owner(
         return Err(ContractError::Unauthorized {});
     }
 
-    if let Some(owner) = owner.clone() {
+    if let Some(owner) = owner.as_ref() {
         let new_owner = deps.api.addr_validate(&owner)?;
         // Update owner.
         NAME_CHAIN_ID_TO_OWNER.save(deps.storage, (name.clone(), chain_id.clone()), &new_owner)?;
@@ -244,6 +241,7 @@ pub fn execute_set_owner(
 pub fn execute_unregister(
     deps: DepsMut,
     sender: Addr,
+    name: String,
     chain_id: String,
     code_id: u64,
 ) -> Result<Response, ContractError> {
@@ -253,54 +251,19 @@ pub fn execute_unregister(
         return Err(ContractError::Unauthorized {});
     }
 
-    // Retrieve contract name.
-    let name = CHAIN_ID_CODE_ID_TO_NAME
-        .load(deps.storage, (chain_id.clone(), code_id))
+    // Retrieve registration.
+    let registration = NAME_CHAIN_ID_CODE_ID_TO_REGISTRATION
+        .load(deps.storage, (name.clone(), chain_id.clone(), code_id))
         .map_err(|_| ContractError::NotFound {})?;
 
-    let registrations = ALL_REGISTRATIONS
-        .load(deps.storage, (name.clone(), chain_id.clone()))
-        .map_err(|_| ContractError::NotFound {})?;
-
-    // Find registration for given code ID. There should only be 1 since
-    // a code ID is a unique instance of a contract on a chain.
-    let registration = registrations
-        .clone()
-        .into_iter()
-        .find(|r| r.code_id == code_id)
-        .ok_or(ContractError::NotFound {})?;
-
-    // Remove from VERSION_REGISTRATION.
-    VERSION_REGISTRATION.remove(
+    // Remove from state.
+    CHAIN_ID_CODE_ID_TO_NAME.remove(deps.storage, (chain_id.clone(), code_id));
+    NAME_CHAIN_ID_VERSION_TO_CODE_ID.remove(
         deps.storage,
         (name.clone(), chain_id.clone(), registration.version),
     );
-
-    // Remove from ALL_REGISTRATIONS.
-    let mut remaining_registrations = registrations;
-    remaining_registrations.retain(|r| r.code_id != code_id);
-    if remaining_registrations.is_empty() {
-        // Clear registrations state if no more.
-        ALL_REGISTRATIONS.remove(deps.storage, (name.clone(), chain_id.clone()));
-        LATEST_REGISTRATION.remove(deps.storage, (name.clone(), chain_id.clone()));
-    } else {
-        // Update with remaining.
-        ALL_REGISTRATIONS.save(
-            deps.storage,
-            (name.clone(), chain_id.clone()),
-            &remaining_registrations,
-        )?;
-        // Update LATEST_REGISTRATION to last registration in vector, just
-        // in case the last one was unregistered.
-        LATEST_REGISTRATION.save(
-            deps.storage,
-            (name.clone(), chain_id.clone()),
-            remaining_registrations.last().unwrap(),
-        )?;
-    }
-
-    // Remove from name map.
-    CHAIN_ID_CODE_ID_TO_NAME.remove(deps.storage, (chain_id.clone(), code_id));
+    NAME_CHAIN_ID_CODE_ID_TO_REGISTRATION
+        .remove(deps.storage, (name.clone(), chain_id.clone(), code_id));
 
     Ok(Response::new()
         .add_attribute("action", "unregister")
@@ -345,7 +308,7 @@ pub fn register_code_id(
     }
 
     // Can't re-register a version.
-    if VERSION_REGISTRATION
+    if NAME_CHAIN_ID_VERSION_TO_CODE_ID
         .may_load(
             deps.storage,
             (name.clone(), chain_id.clone(), registration.version.clone()),
@@ -359,24 +322,16 @@ pub fn register_code_id(
         ));
     };
 
-    ALL_REGISTRATIONS.update(
+    // Add to state.
+    NAME_CHAIN_ID_CODE_ID_TO_REGISTRATION.save(
         deps.storage,
-        (name.clone(), chain_id.clone()),
-        |registrations| -> StdResult<Vec<Registration>> {
-            let mut existing = registrations.unwrap_or_default();
-            existing.push(registration.clone());
-            Ok(existing)
-        },
+        (name.clone(), chain_id.clone(), registration.code_id),
+        &registration,
     )?;
-    VERSION_REGISTRATION.save(
+    NAME_CHAIN_ID_VERSION_TO_CODE_ID.save(
         deps.storage,
         (name.clone(), chain_id.clone(), registration.version.clone()),
-        &registration,
-    )?;
-    LATEST_REGISTRATION.save(
-        deps.storage,
-        (name.clone(), chain_id.clone()),
-        &registration,
+        &registration.code_id,
     )?;
     CHAIN_ID_CODE_ID_TO_NAME.save(deps.storage, (chain_id, registration.code_id), &name)?;
 
@@ -430,7 +385,7 @@ pub fn execute_update_config(
     let admin = deps.api.addr_validate(&new_admin)?;
 
     // Validate payment info
-    validate_payment_info(deps.as_ref(), new_payment_info.clone())?;
+    validate_payment_info(deps.as_ref(), &new_payment_info)?;
 
     config.admin = admin;
     config.payment_info = new_payment_info;
@@ -465,17 +420,31 @@ pub fn query_get_registration(
     version: Option<String>,
 ) -> StdResult<Binary> {
     let registration = if let Some(version) = version {
-        VERSION_REGISTRATION
-            .load(deps.storage, (name, chain_id, version))
+        // Get specific version if passed.
+        let code_id = NAME_CHAIN_ID_VERSION_TO_CODE_ID
+            .load(deps.storage, (name.clone(), chain_id.clone(), version))
+            .map_err(|_| StdError::GenericErr {
+                msg: ContractError::NotFound {}.to_string(),
+            })?;
+
+        NAME_CHAIN_ID_CODE_ID_TO_REGISTRATION
+            .load(deps.storage, (name, chain_id, code_id))
             .map_err(|_| StdError::GenericErr {
                 msg: ContractError::NotFound {}.to_string(),
             })?
     } else {
-        LATEST_REGISTRATION
-            .load(deps.storage, (name, chain_id))
+        // Get most recent code ID registration.
+        NAME_CHAIN_ID_CODE_ID_TO_REGISTRATION
+            .prefix((name, chain_id))
+            .range(deps.storage, None, None, Order::Descending)
+            .nth(0)
+            .ok_or(StdError::GenericErr {
+                msg: ContractError::NotFound {}.to_string(),
+            })?
             .map_err(|_| StdError::GenericErr {
                 msg: ContractError::NotFound {}.to_string(),
             })?
+            .1
     };
     to_binary(&GetRegistrationResponse { registration })
 }
@@ -488,14 +457,10 @@ pub fn query_info_for_code_id(deps: Deps, chain_id: String, code_id: u64) -> Std
             msg: ContractError::NotFound {}.to_string(),
         })?;
 
-    let registrations = ALL_REGISTRATIONS.load(deps.storage, (name.clone(), chain_id))?;
-
-    // Find registration for given code ID. There should only be 1 since
-    // a code ID is a unique instance of a contract on a chain.
-    let registration = registrations
-        .into_iter()
-        .find(|r| r.code_id == code_id)
-        .ok_or(StdError::GenericErr {
+    // Retrieve registration.
+    let registration = NAME_CHAIN_ID_CODE_ID_TO_REGISTRATION
+        .load(deps.storage, (name.clone(), chain_id.clone(), code_id))
+        .map_err(|_| StdError::GenericErr {
             msg: ContractError::NotFound {}.to_string(),
         })?;
 
@@ -507,11 +472,14 @@ pub fn query_info_for_code_id(deps: Deps, chain_id: String, code_id: u64) -> Std
     })
 }
 
+// TODO: Paginate.
 pub fn query_list_registrations(deps: Deps, name: String, chain_id: String) -> StdResult<Binary> {
-    let registrations = ALL_REGISTRATIONS
-        .load(deps.storage, (name, chain_id))
-        .map_err(|_| StdError::GenericErr {
-            msg: ContractError::NotFound {}.to_string(),
-        })?;
+    let registrations = NAME_CHAIN_ID_CODE_ID_TO_REGISTRATION
+        .prefix((name, chain_id))
+        .range(deps.storage, None, None, Order::Ascending)
+        .collect::<StdResult<Vec<(u64, Registration)>>>()?
+        .into_iter()
+        .map(|(_, registration)| registration)
+        .collect();
     to_binary(&ListRegistrationsResponse { registrations })
 }

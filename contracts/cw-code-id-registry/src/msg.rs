@@ -31,7 +31,7 @@ pub enum ExecuteMsg {
         owner: Option<String>,
     },
     /// Allow admin to unregister code IDs.
-    Unregister { chain_id: String, code_id: u64 },
+    Unregister { name: String, chain_id: String, code_id: u64 },
     /// Update config.
     UpdateConfig {
         admin: Option<String>,

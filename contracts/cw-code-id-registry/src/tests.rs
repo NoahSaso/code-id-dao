@@ -8,6 +8,7 @@ use anyhow::Result as AnyResult;
 use cosmwasm_std::{coin, coins, to_binary, Addr, Coin, Empty, StdResult, Uint128};
 use cw20::{BalanceResponse, Cw20Coin};
 use cw_multi_test::{App, AppResponse, Contract, ContractWrapper, Executor};
+use cw_utils::PaymentError;
 
 const USER_ADDR: &str = "user";
 const OTHER_USER_ADDR: &str = "other_user";
@@ -228,10 +229,12 @@ fn set_owner(
 fn unregister(
     app: &mut App,
     contract_addr: Addr,
+    name: String,
     code_id: u64,
     sender: Addr,
 ) -> AnyResult<AppResponse> {
     let msg = ExecuteMsg::Unregister {
+        name,
         chain_id: CHAIN_ID.to_string(),
         code_id,
     };
@@ -495,7 +498,10 @@ fn test_register_native() {
     .unwrap_err()
     .downcast()
     .unwrap();
-    assert_eq!(err, ContractError::UnrecognizedNativeToken {});
+    assert_eq!(
+        err,
+        ContractError::Payment(PaymentError::MissingDenom("ujuno".to_string()))
+    );
 
     // Sending too little should fail.
     let err: ContractError = register_native(
@@ -904,7 +910,7 @@ fn test_unregister() {
             payment_amount: Uint128::new(50),
         },
     );
-    let name: &str = "Name1";
+    let name: &str = "Name";
     let version1: &str = "0.0.1";
     let code_id1: u64 = 1;
     let version2: &str = "0.0.2";
@@ -997,6 +1003,7 @@ fn test_unregister() {
     let err: ContractError = unregister(
         &mut app,
         contract.clone(),
+        name.to_string(),
         code_id3,
         Addr::unchecked(USER_ADDR),
     )
@@ -1009,6 +1016,7 @@ fn test_unregister() {
     unregister(
         &mut app,
         contract.clone(),
+        name.to_string(),
         code_id3,
         Addr::unchecked(ADMIN_ADDR),
     )
@@ -1048,6 +1056,7 @@ fn test_unregister() {
     unregister(
         &mut app,
         contract.clone(),
+        name.to_string(),
         code_id1,
         Addr::unchecked(ADMIN_ADDR),
     )
@@ -1055,6 +1064,7 @@ fn test_unregister() {
     unregister(
         &mut app,
         contract.clone(),
+        name.to_string(),
         code_id2,
         Addr::unchecked(ADMIN_ADDR),
     )
@@ -1067,11 +1077,9 @@ fn test_unregister() {
         .to_string()
         .contains(&ContractError::NotFound {}.to_string()));
 
-    // Get all registrations and expect not found.
-    let err = query_list_registrations(&mut app, contract, name.to_string()).unwrap_err();
-    assert!(err
-        .to_string()
-        .contains(&ContractError::NotFound {}.to_string()));
+    // Get all registrations and expect empty list found.
+    let response = query_list_registrations(&mut app, contract, name.to_string()).unwrap();
+    assert_eq!(response.registrations.len(), 0);
 }
 
 #[test]
@@ -1179,6 +1187,7 @@ fn test_mutable_after_unregister() {
     unregister(
         &mut app,
         contract.clone(),
+        name.to_string(),
         code_id,
         Addr::unchecked(ADMIN_ADDR),
     )
@@ -1200,6 +1209,7 @@ fn test_mutable_after_unregister() {
     unregister(
         &mut app,
         contract.clone(),
+        name.to_string(),
         code_id,
         Addr::unchecked(ADMIN_ADDR),
     )

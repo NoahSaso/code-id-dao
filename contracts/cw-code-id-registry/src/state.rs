@@ -37,17 +37,14 @@ pub struct Registration {
 
 pub const CONFIG: Item<Config> = Item::new("config");
 
-/// Map (name, chain_id) to all registrations.
-pub const ALL_REGISTRATIONS: Map<(String, String), Vec<Registration>> =
-    Map::new("all_registrations");
-/// Map (name, chain_id, version) to a registration.
-pub const VERSION_REGISTRATION: Map<(String, String, String), Registration> =
-    Map::new("version_registration");
-/// Map (name, chain_id) to latest registration.
-pub const LATEST_REGISTRATION: Map<(String, String), Registration> =
-    Map::new("latest_registration");
+/// Map (name, chain_id, version) to a code_id.
+pub const NAME_CHAIN_ID_VERSION_TO_CODE_ID: Map<(String, String, String), u64> =
+    Map::new("name_chain_id_version_to_code_id");
 /// Map (name, chain_id) to the owner.
 pub const NAME_CHAIN_ID_TO_OWNER: Map<(String, String), Addr> = Map::new("owner");
 /// Map (chain_id, code_id) to the contract name.
 pub const CHAIN_ID_CODE_ID_TO_NAME: Map<(String, u64), String> =
     Map::new("chain_id_code_id_to_name");
+/// Map (name, chain_id, code_id) to the registration.
+pub const NAME_CHAIN_ID_CODE_ID_TO_REGISTRATION: Map<(String, String, u64), Registration> =
+    Map::new("name_chain_id_code_id_to_registration");
