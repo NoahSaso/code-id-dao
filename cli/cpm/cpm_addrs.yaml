@@ -1,0 +1,5 @@
+# These will be used as default `cpm_registry` values when generating `cpm.yaml` files through the cli
+
+default_addrs:
+  "testnets/junotestnet": "juno1tgz6fdlqlznat2kya2qqe8jzh9r9pure8585j73xtdpcacyjegssa38apd"
+  "juno": ""
