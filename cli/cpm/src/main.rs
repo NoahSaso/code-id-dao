@@ -13,17 +13,20 @@ use std::{env, fs};
 
 mod cli;
 
+// TODO: Add verbose/debug flag
 const CPM_REGISTRY_NAME: &str = "cosmwasm-package-manager";
 pub type ContractName = String;
+pub type ChainID = String;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct CPMConfig {
     /// registry_addr is the contract address to use as the source of truth for all code id registration
     pub registry_addr: String,
-    /// chain_id uses this chain info from the [chain registry](https://github.com/cosmos/chain-registry)
+    /// chain_id where cw-code-id-registry contract is instantiated.
+    /// populates chain info from the [chain registry](https://github.com/cosmos/chain-registry)
     pub chain_id: String,
     /// contract dependencies to download code_ids for into lock file
-    pub dependencies: HashMap<ContractName, Dependency>,
+    pub dependencies: HashMap<ChainID, HashMap<ContractName, Dependency>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -40,20 +43,18 @@ pub struct LockFile {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct LockDep {
     pub name: ContractName,
+    pub chain_id: ChainID,
     pub registered_by: Addr,
     pub version: String,
     pub code_id: u64,
     pub checksum: String,
 }
 
-fn main() -> Result<()> {
-    env_logger::init();
-    let cli = Cli::parse();
-
-    // get directory containing the `cpm.yaml` config file:
-    let config_dir: PathBuf = if let Some(config) = cli.config {
+/// get directory containing the `cpm.yaml` config file:
+fn config_dir(cfg: Option<PathBuf>) -> Result<String> {
+    let config_dir: PathBuf = if let Some(config) = cfg {
         if config.is_file() {
-            config.parent().unwrap().to_path_buf()
+            config.parent().context("invalid config dir")?.to_path_buf()
         } else {
             config
         }
@@ -66,7 +67,16 @@ fn main() -> Result<()> {
         config_dir = ".";
     }
 
-    let file = &fs::read(format!("{config_dir}/cpm.yaml")).context(format!(
+    Ok(config_dir.to_string())
+}
+
+fn main() -> Result<()> {
+    env_logger::init();
+    let cli = Cli::parse();
+
+    let config_dir = config_dir(cli.config)?;
+
+    let file = &fs::read(format!("{}/cpm.yaml", &config_dir)).context(format!(
         "cpm.yaml file not found in: {}. See --help",
         config_dir
     ))?;
@@ -90,8 +100,9 @@ fn main() -> Result<()> {
     if let Some(cmd) = &cli.command {
         match cmd {
             Commands::Init => todo!(),
-            Commands::Install => install(&cfg, config_dir, &orc),
+            Commands::Install => install(&cfg, &config_dir, &orc),
             Commands::Upgrade => todo!(),
+            Commands::Release => todo!(),
         }?;
     }
 
@@ -103,26 +114,29 @@ fn install(cfg: &CPMConfig, config_dir: &str, orc: &CosmOrc) -> Result<()> {
         dependencies: vec![],
     };
 
-    for (contract_name, dep) in &cfg.dependencies {
-        let res: GetRegistrationResponse = orc
-            .query(
-                CPM_REGISTRY_NAME,
-                &QueryMsg::GetRegistration {
-                    name: contract_name.clone(),
-                    chain_id: cfg.chain_id.clone(),
-                    version: dep.version.clone(),
-                },
-            )?
-            .data()?;
+    for (chain_id, deps) in &cfg.dependencies {
+        for (contract_name, dep) in deps {
+            let res: GetRegistrationResponse = orc
+                .query(
+                    CPM_REGISTRY_NAME,
+                    &QueryMsg::GetRegistration {
+                        name: contract_name.clone(),
+                        chain_id: chain_id.clone(),
+                        version: dep.version.clone(),
+                    },
+                )?
+                .data()?;
 
-        let reg = res.registration;
-        lock_file.dependencies.push(LockDep {
-            name: contract_name.clone(),
-            registered_by: reg.registered_by,
-            version: reg.version,
-            code_id: reg.code_id,
-            checksum: reg.checksum,
-        })
+            let reg = res.registration;
+            lock_file.dependencies.push(LockDep {
+                name: contract_name.clone(),
+                chain_id: chain_id.clone(),
+                registered_by: reg.registered_by,
+                version: reg.version,
+                code_id: reg.code_id,
+                checksum: reg.checksum,
+            })
+        }
     }
 
     // TODO: Sort the dependencies in alpha order to make the lockfile deterministic

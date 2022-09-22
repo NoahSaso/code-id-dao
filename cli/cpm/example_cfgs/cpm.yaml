@@ -1,14 +1,16 @@
-# Example cpm.yaml file for juno testnet
-
 # registry_addr is the cw-code-id-registry contract address to use as the source of truth for all code id registration
 registry_addr: "juno1tgz6fdlqlznat2kya2qqe8jzh9r9pure8585j73xtdpcacyjegssa38apd"
-
-# chain_id uses this chain info from the [chain registry](https://github.com/cosmos/chain-registry)
+# chain_id where cw-code-id-registry contract is instantiated.
+# populates chain info from the [chain registry](https://github.com/cosmos/chain-registry)
 chain_id: "testnets/junotestnet"
 
 # cpm will download the code_ids for each of the following and store them in the `cpm.lock` file:
 dependencies:
-  cw20_base:
-    version: "v0.11.0"
-  # use the latest version by default:
-  cw4_group:
+  juno-1:
+    # use the latest version by default
+    cw20_base:
+    cw4_group:
+  uni-3:
+    cw20_base:
+      version: "v0.11.0"
+    cw4_group:

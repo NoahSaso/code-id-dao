@@ -22,4 +22,6 @@ pub enum Commands {
     Install,
     /// Upgrade to the latest versions for each contract stored in `cpm.yaml`
     Upgrade,
+    /// Release a new version of your smart contract package stored in `cpm.yaml`
+    Release,
 }
