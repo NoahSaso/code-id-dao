@@ -1,13 +1,13 @@
 dependencies:
-- name: cw4_group
-  chain_id: testnets/junotestnet
-  registered_by: juno1n4p7umr45nfx06alkln3pv5vjc3kgzp6gxetvafrehxcplmeqdjq0vz3tf
-  version: v0.11.0
-  code_id: 78
-  checksum: 87b3ad1dee979afc70e5c0f19e8510d9dcc8372c8ef49fc1da76725cad706975
 - name: cw20_base
-  chain_id: testnets/junotestnet
-  registered_by: juno1n4p7umr45nfx06alkln3pv5vjc3kgzp6gxetvafrehxcplmeqdjq0vz3tf
-  version: v0.11.0
-  code_id: 77
-  checksum: 6c1fa5872e1db821ee207b5043d679ad1f57c40032d2fd01834cd04d0f3dbafb
+  chain_id: uni-5
+  registered_by: juno1uyt8f5ls0e8dy3748catf3n9q3qh53f3mnpc8yva3jhx7e5ug7wqjk9grt
+  version: 0.15.1
+  code_id: 229
+  checksum: f35f2e929bb6ade19f6f247623eaf9bb0274b42874ab183a486784141df7c5a2
+- name: cw4_group
+  chain_id: uni-5
+  registered_by: juno1uyt8f5ls0e8dy3748catf3n9q3qh53f3mnpc8yva3jhx7e5ug7wqjk9grt
+  version: 0.15.1
+  code_id: 230
+  checksum: 51b8dcc03e9ff426e54c31556af4a683db2f0ae55908a284a7b268d308d41fab

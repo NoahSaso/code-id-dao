@@ -1,0 +1,15 @@
+release:
+  dao_addr: juno1uyt8f5ls0e8dy3748catf3n9q3qh53f3mnpc8yva3jhx7e5ug7wqjk9grt
+  packages:
+  - name: cw_code_id_registry
+    version: 0.1.4
+    description: Cosmwasm smart contract package registry
+    authors:
+    - Noah Saso <noahsaso@gmail.com>
+    - Callum Anderson <callumanderson745@gmail.com>
+    keywords:
+    - registry
+    - tooling
+    website: https://testnet.daodao.zone/dao/juno1uyt8f5ls0e8dy3748catf3n9q3qh53f3mnpc8yva3jhx7e5ug7wqjk9grt
+chain_id: testnets/junotestnet
+dependencies: {}
