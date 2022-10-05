@@ -1,16 +1,34 @@
-# registry_addr is the cw-code-id-registry contract address to use as the source of truth for all code id registration
-registry_addr: "juno1tgz6fdlqlznat2kya2qqe8jzh9r9pure8585j73xtdpcacyjegssa38apd"
-# chain_id where cw-code-id-registry contract is instantiated.
-# populates chain info from the [chain registry](https://github.com/cosmos/chain-registry)
-chain_id: "testnets/junotestnet"
+chain_id: testnets/junotestnet
 
-# cpm will download the code_ids for each of the following and store them in the `cpm.lock` file:
+# optional section used by `cpm release`
+release:
+  # DAO that is controlling admin over the package's cw_code_id_registry instance
+  # will be used to `cpm release` new versions
+  dao_addr: juno1uyt8f5ls0e8dy3748catf3n9q3qh53f3mnpc8yva3jhx7e5ug7wqjk9grt
+
+  # packages is an optional section that allows you to `cpm release` your own contract
+  packages:
+    - name: cw_code_id_registry
+      version: 0.1.3
+      description: Cosmwasm smart contract package registry
+      authors:
+      - Noah Saso <noahsaso@gmail.com>
+      - Callum Anderson <callumanderson745@gmail.com>
+      keywords:
+      - registry
+      - tooling
+      website: https://testnet.daodao.zone/dao/juno1n4p7umr45nfx06alkln3pv5vjc3kgzp6gxetvafrehxcplmeqdjq0vz3tf
+
+# optional section used by `cpm install` 
+# will download the code_ids for each of the following and store them in the `cpm.lock` file:
 dependencies:
-  juno-1:
-    # use the latest version by default
-    cw20_base:
-    cw4_group:
-  uni-3:
-    cw20_base:
-      version: "v0.11.0"
-    cw4_group:
+  # all deps are defined for an org's cw_code_id_registry contract addr
+  juno1fkxf7l4y5wffsh0s0ygj4uu25jn7da2tkg68m7grrfy08d03af6sedapw0:
+    # juno-1:
+    #   # use the latest version by default
+    #   cw20_base:
+    #   cw4_group:
+    uni-5:
+      cw20_base:
+        version: "0.15.1"
+      cw4_group:

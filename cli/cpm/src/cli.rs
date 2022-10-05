@@ -18,10 +18,30 @@ pub struct Cli {
 pub enum Commands {
     /// Initializes a new cpm.yaml config
     Init,
-    /// Download the code ids into `cpm.lock` for each configured contract version
+    /// Download the code ids into `cpm.lock` for each configured contract dependency
     Install,
-    /// Upgrade to the latest versions for each contract stored in `cpm.yaml`
+    /// Upgrade to the latest versions for each contract dependency in `cpm.yaml`
     Upgrade,
-    /// Release a new version of your smart contract package stored in `cpm.yaml`
-    Release,
+    /// Bump version, store on chain, and release each contract package in `cpm.yaml`
+    Release {
+        /// Cosmos chain registry chain_id to use for contract storage
+        #[clap(long, action)]
+        chain_reg_id: String,
+
+        /// Path to Cargo.toml
+        #[clap(long, action)]
+        cargo_path: PathBuf,
+
+        /// OS Keyring key_name for corresponding mnemonic to use for wasm storage
+        #[clap(short, long, action)]
+        store_key_name: String,
+
+        /// OS Keyring key_name for corresponding mnemonic to use for DAO proposal
+        #[clap(short, long, action)]
+        prop_key_name: String,
+
+        /// New version to release the packages under
+        #[clap(value_parser)]
+        version: String,
+    },
 }
