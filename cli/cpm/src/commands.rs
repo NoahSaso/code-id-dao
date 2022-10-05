@@ -112,20 +112,11 @@ pub(crate) fn release(
         ));
     }
 
-    // bump smart contract version to `version` in cpm.yaml:
-    let mut cfg_bump = cfg.clone();
-    for pkg in &mut cfg_bump.release.as_mut().unwrap().packages {
-        pkg.version = version.clone()
-    }
-    fs::write(
-        format!("{config_dir}/cpm.yaml"),
-        serde_yaml::to_string(&cfg_bump)?,
-    )?;
+    bump_version(version.clone(), cfg.clone(), config_dir)?;
 
-    // optimize / store wasms:
     let (mut store_orc, storage_chain_id) = init_orc(chain_reg_id.to_string())?;
 
-    store_orc.optimize_contracts(cargo_path)?;
+    optimize_contracts(&store_orc, cargo_path)?;
 
     // TODO: Call `store_contract()` instead and call it only for the packages configured in `cpm.yaml`
     let artifacts_dir = format!("{config_dir}/artifacts");
@@ -159,6 +150,7 @@ pub(crate) fn release(
     }
 
     // make a proposal in the configured DAO to register new versions:
+
     let (mut dao_orc, _) = init_orc(cfg.chain_id.clone())?;
     dao_orc.contract_map.add_address("dao", &release.dao_addr)?;
 
@@ -233,6 +225,27 @@ pub(crate) fn release(
     }
 
     println!("skipping. . .");
+
+    Ok(())
+}
+
+// bump smart contract version to `version` in cpm.yaml:
+fn bump_version(version: String, mut cfg: CPMConfig, config_dir: &str) -> Result<()> {
+    for pkg in &mut cfg.release.as_mut().unwrap().packages {
+        pkg.version = version.clone()
+    }
+    fs::write(
+        format!("{config_dir}/cpm.yaml"),
+        serde_yaml::to_string(&cfg)?,
+    )?;
+
+    Ok(())
+}
+
+#[allow(unused_variables)]
+fn optimize_contracts(orc: &CosmOrc, cargo_path: &str) -> Result<()> {
+    #[cfg(feature = "optimize")]
+    orc.optimize_contracts(cargo_path)?;
 
     Ok(())
 }

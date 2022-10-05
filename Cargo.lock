@@ -623,9 +623,9 @@ checksum = "5827cebf4670468b8772dd191856768aedcb1b0278a04f989f7766351917b9dc"
 
 [[package]]
 name = "cosm-orc"
-version = "2.6.0"
+version = "2.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69c5127986d564e74bcfbb960e6d0688e9c1928c6270466aadc7a0bb9a2ee077"
+checksum = "49badda8d580cbb0a093f1d9c077f934860cc451d0c230d70f22c4ce9900007e"
 dependencies = [
  "chain-registry",
  "config",
@@ -634,6 +634,7 @@ dependencies = [
  "cw-optimizoor",
  "keyring",
  "log",
+ "rand",
  "serde",
  "serde_json",
  "tendermint-rpc",

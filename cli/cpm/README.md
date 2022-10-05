@@ -10,7 +10,7 @@ Use the [cpm site](TODO) to search for packages across all orgs.
 
 ## Installation
 
-`cargo install cosmwasm-package-manager`
+`cargo install cosmwasm-package-manager --features optimize`
 
 ## Usage 
 
